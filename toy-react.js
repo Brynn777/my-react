@@ -1,50 +1,18 @@
 const RENDER_TO_DOM = Symbol('render to dom')
 
-class ElementWrapper {
-  constructor(type) {
-    this.root = document.createElement(type)
-  }
-  setAttribute(name, value) {
-    if (name.match(/^on([\s\S]+)$/)) {
-      this.root.addEventListener(
-        RegExp.$1.replace(/^[\s\S]/, (c) => c.toLowerCase),
-        value
-      )
-    } else {
-      if (name === 'className') {
-        this.root.setAttribute('class', value)
-      } else {
-        this.root.setAttribute(name, value)
-      }
-    }
-  }
-  [RENDER_TO_DOM](range) {
-    range.deleteContents()
-    range.insertNode(this.root)
-  }
-  appendChild(component) {
-    let range = document.createRange()
-    range.setStart(this.root, this.root.childNodes.length)
-    range.setEnd(this.root, this.root.childNodes.length)
-    component[RENDER_TO_DOM](range)
-  }
-}
-
-class TextWrapper {
-  constructor(content) {
-    this.root = document.createTextNode(content)
-  }
-  [RENDER_TO_DOM](range) {
-    range.deleteContents()
-    range.insertNode(this.root)
-  }
-}
-
+/**
+ * 流程2：Component返回一个对象
+ * {
+ *    range:RENDER_TO_DOM方法
+ *    props:
+ *    children:
+ * }
+ * 用对象上的属性和方法达到ElementWrapper
+ */
 export class Component {
   constructor() {
     this.props = Object.create(null)
     this.children = []
-    this._root = null
     this._range = null
   }
   setAttribute(name, value) {
@@ -85,21 +53,65 @@ export class Component {
     this.rerender()
   }
 }
-
-export function render(component, parentElement) {
-  let range = document.createRange()
-  range.setStart(parentElement, 0)
-  range.setEnd(parentElement, parentElement.childNodes.length)
-  range.deleteContents()
-  component[RENDER_TO_DOM](range)
+/**
+ * 流程2
+ * ElementWrapper返回一个对象
+ * {
+ *    root：dom
+ * }
+ */
+class ElementWrapper {
+  constructor(type) {
+    this.root = document.createElement(type)
+  }
+  setAttribute(name, value) {
+    if (name.match(/^on([\s\S]+)$/)) {
+      this.root.addEventListener(
+        RegExp.$1.replace(/^[\s\S]/, (c) => c.toLowerCase()),
+        value
+      )
+    } else {
+      if (name === 'className') {
+        this.root.setAttribute('class', value)
+      } else {
+        this.root.setAttribute(name, value)
+      }
+    }
+  }
+  appendChild(component) {
+    let range = document.createRange()
+    range.setStart(this.root, this.root.childNodes.length)
+    range.setEnd(this.root, this.root.childNodes.length)
+    component[RENDER_TO_DOM](range)
+  }
+  [RENDER_TO_DOM](range) {
+    range.deleteContents()
+    range.insertNode(this.root)
+  }
+}
+class TextWrapper {
+  constructor(content) {
+    this.root = document.createTextNode(content)
+  }
+  [RENDER_TO_DOM](range) {
+    range.deleteContents()
+    range.insertNode(this.root)
+  }
 }
 
+// 流程1.jsx被babel编译成createElement，最终返回一个ElemmentWrapper
+/**
+ * 节点是一个原生html标签，直接调用ElementWrapper
+ * 节点是一个继承component组件，会递归insertChildren直到变成全部是原生html标签，形成ElementWrapper
+ */
 export function createElement(type, attributes, ...children) {
   let e
   if (typeof type == 'string') {
     e = new ElementWrapper(type)
+    console.log('元素类型string', type)
   } else {
     e = new type()
+    console.log('元素类型function', type)
   }
   for (let p in attributes) {
     e.setAttribute(p, attributes[p])
@@ -121,4 +133,11 @@ export function createElement(type, attributes, ...children) {
   }
   insertChildren(children)
   return e
+}
+export function render(component, parentElement) {
+  let range = document.createRange()
+  range.setStart(parentElement, 0)
+  range.setEnd(parentElement, parentElement.childNodes.length)
+  range.deleteContents()
+  component[RENDER_TO_DOM](range)
 }
